@@ -1,0 +1,20 @@
+{
+  "memories": [],
+  "settings": {
+    "test_user": {
+      "userId": "test_user",
+      "memoryEnabled": true,
+      "voice": "Aoede",
+      "auraMood": "cyberpunk",
+      "updatedAt": "2026-10-05T15:26:09.834Z"
+    },
+    "user_demo": {
+      "userId": "user_demo",
+      "memoryEnabled": true,
+      "voice": "Aoede",
+      "auraMood": "cyberpunk",
+      "updatedAt": "2026-10-05T15:27:05.838Z"
+    }
+  },
+  "version": 1
+}

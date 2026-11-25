@@ -1,0 +1,179 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 320
+        && data.displayName is string
+        && data.displayName.size() <= 120
+        && data.voice is string
+        && data.voice.size() >= 1
+        && data.voice.size() <= 40
+        && data.auraMood is string
+        && data.auraMood.size() >= 1
+        && data.auraMood.size() <= 40
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMemoryRecord(data) {
+      return data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.userId == request.auth.uid
+        && data.type is string
+        && data.type.size() >= 1
+        && data.type.size() <= 40
+        && data.content is string
+        && data.content.size() >= 1
+        && data.content.size() <= 2000
+        && data.confidence is number
+        && data.confidence >= 0
+        && data.confidence <= 1
+        && data.importance is number
+        && data.importance >= 0
+        && data.importance <= 1
+        && data.active is bool
+        && data.source is string
+        && data.source.size() >= 1
+        && data.source.size() <= 80
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserCreation(data) {
+      return data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.userId == request.auth.uid
+        && data.kind is string
+        && data.kind in ['chat_note', 'image', 'music', 'transcript', 'place', 'game_score']
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 200
+        && data.summary is string
+        && data.summary.size() <= 4000
+        && data.model is string
+        && data.model.size() >= 1
+        && data.model.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isVerified()
+        && isValidId(userId)
+        && incoming().keys().hasAll(['uid', 'email', 'displayName', 'voice', 'auraMood', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['uid', 'email', 'displayName', 'voice', 'auraMood', 'createdAt', 'updatedAt'])
+        && isValidUserProfile(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isVerified()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'voice', 'auraMood', 'updatedAt']);
+      allow delete: if isOwner(userId) && isVerified() && isValidId(userId);
+
+      match /memories/{memoryId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(memoryId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(memoryId)
+          && incoming().keys().hasAll(['userId', 'type', 'content', 'confidence', 'importance', 'active', 'source', 'createdAt', 'updatedAt'])
+          && incoming().keys().hasOnly(['userId', 'type', 'content', 'confidence', 'importance', 'active', 'source', 'createdAt', 'updatedAt'])
+          && isValidMemoryRecord(incoming())
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if isOwner(userId)
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(memoryId)
+          && isValidMemoryRecord(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['type', 'content', 'confidence', 'importance', 'active', 'updatedAt'])
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if isOwner(userId) && isVerified() && isValidId(userId) && isValidId(memoryId);
+      }
+
+      match /creations/{creationId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(creationId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(creationId)
+          && incoming().keys().hasAll(['userId', 'kind', 'title', 'summary', 'model', 'createdAt', 'updatedAt'])
+          && incoming().keys().hasOnly(['userId', 'kind', 'title', 'summary', 'model', 'createdAt', 'updatedAt'])
+          && isValidUserCreation(incoming())
+          && incoming().userId == userId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if isOwner(userId)
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(creationId)
+          && isValidUserCreation(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'summary', 'updatedAt'])
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if isOwner(userId) && isVerified() && isValidId(userId) && isValidId(creationId);
+      }
+    }
+  }
+}

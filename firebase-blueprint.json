@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and Tojuu companion preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 320 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "voice": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "auraMood": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "voice", "auraMood", "createdAt", "updatedAt"]
+    },
+    "MemoryRecord": {
+      "title": "MemoryRecord",
+      "description": "User-scoped long-term memory synced from Tojuu voice/chat interactions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "content": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "confidence": { "type": "number" },
+        "importance": { "type": "number" },
+        "active": { "type": "boolean" },
+        "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "content", "confidence", "importance", "active", "source", "createdAt", "updatedAt"]
+    },
+    "UserCreation": {
+      "title": "UserCreation",
+      "description": "Lightweight metadata index for user-created AI outputs, transcripts, saved places, or high scores.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "kind": { "type": "string", "enum": ["chat_note", "image", "music", "transcript", "place", "game_score"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "summary": { "type": "string", "maxLength": 4000 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "kind", "title", "summary", "model", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and Tojuu companion preferences, readable and writable only by the authenticated owner."
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": { "$ref": "#/entities/MemoryRecord" },
+      "description": "User-owned Tojuu long-term memory records synced to Firestore."
+    },
+    "/users/{userId}/creations/{creationId}": {
+      "schema": { "$ref": "#/entities/UserCreation" },
+      "description": "User-owned lightweight records of AI creations, transcriptions, places, and game scores."
+    }
+  }
+}
